@@ -77,11 +77,7 @@ summary(imputed_dataset_5)
 
 ########## REGRESSION MODELS  #############
 #packages
-library(mice)
-library(mitools)
-library(ordinal)
-library(mice)
-library(pool)
+library(MASS)
 
 imp_reg<-imp_data %>% filter(.imp !=0)
 
