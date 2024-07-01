@@ -1,8 +1,8 @@
 ### THIS SCRIPT THE CODE FOR THE ANALYSES OF THE PAPER: "Association of childhood and adult socioeconomic status with adult social relationships" ###
-#CONTENTS: 1) Preparing the data set, 2) Regression models, 3) Causal Mediation Analysis, 4) Sensitivity analysis, 5) CMA with interaction ExpxMed
+#CONTENTS: 1) Data wrangling, imputation, 2) Regression models, 3) Causal Mediation Analysis, 4) Sensitivity analysis, 5) CMA with interaction ExpxMed
 
-### Preparing the dataset: Multiple Imputation and Re-Scaling the variables ###
-#1.Select complete data at baseline (n=3,358)
+### 1. Preparing the dataset: Multiple Imputation and Re-Scaling the variables ###
+#1.1. Select complete data at baseline (n=3,358)
 new_compbas<- data %>% filter(complete.cases(edu80, occ80, income80, toimi80))
 
 #Model variables and auxiliary variables as factors
@@ -12,13 +12,13 @@ vars_to_convert <- c("edu80", "edu107", "edu111", "occ80", "occ107", "occ111",
 
 new_compbas[vars_to_convert] <- lapply(new_compbas[vars_to_convert], as.factor)
 
-#2.Multiple imputation by chained equations
+#1.2. Multiple imputation by chained equations
 library(mice)
 init = mice(new_compbas, maxit=0) 
 meth = init$method
 predM = init$predictorMatrix
 
-#id has not preditive value
+#id has no predictive value
 predM[, c("id")]=0
 
 meth[c("age", "loneliness", "social_network", "social_relations")]="pmm" #numerical
@@ -30,7 +30,7 @@ set.seed(103)
 imputed.bas = mice(new_compbas, method=meth, predictorMatrix=predM, m=5)
 imputed_datasets <- complete(imputed.bas, action = "long", include = TRUE)
 
-#3. Select those with complete data for the outcomes (not imputed outcomes)
+#1.3. Select those with complete data for the outcomes (not imputed outcomes)
 new_compout<- new_compbas %>% filter(complete.cases(loneliness, social_network, social_relations)) #social_relations=MSPSS scores
 compout<-new_compout %>% select(id, loneliness, social_network, social_relations)
 
@@ -38,7 +38,7 @@ imp_data<-left_join(compout, imputed_datasets, by="id")
 imp_data<-imp_data %>% select(id, .imp, .id, age, sex, edu80, income80, edu107, income07, loneliness=loneliness.x, social_network=social_network.x, social_relations=social_relations.x)
 imp_data<-imputed.bas
 
-#4. Arranging the variables #
+#1.4. Arranging the variables #
 #education (primary and low secondary education as risk)
 imp_data$edu107 <-recode(imp_data$edu107, `0` = 1, `1` = 1, `2` = 0, `3` = 0) #also upper secondary as at risk
 summary(imp_data$edu107)
@@ -75,7 +75,7 @@ summary(imputed_dataset_4)
 imputed_dataset_5 <- subset(imp_data, .imp == 5)
 summary(imputed_dataset_5)
 
-########## REGRESSION MODELS  #############
+### 2. REGRESSION MODELS ###
 #packages
 library(MASS)
 
@@ -99,7 +99,7 @@ summary_data$OR_Upper_CI <- exp(summary_data$Upper_CI)
 print(summary_data[, c("term", "estimate", "std.error", "Odds_Ratio", "Lower_CI", "Upper_CI", "OR_Lower_CI", "OR_Upper_CI", "p.value")])
 }
 
-#function for pooling and CIs (continous variables)
+#function for pooling and CIs (continuous variables)
 CI<- function(x) {pooled_model <- pool(x)
 summary_data <- summary(pooled_model)
 
@@ -159,7 +159,7 @@ sp_inc07 <- lapply(1:num_imputations, function(i) {
 sp_inc07<-CI(sp_inc07)
 
 
-############ CAUSAL MEDIATION MODELS ###########
+### 3. CAUSAL MEDIATION MODELS ###
 library(CMAverse)
 #FUNCTIONS
 #Runs the CMA models in the 5 imputed datasets
@@ -226,7 +226,7 @@ income_cmest_0 <- function(x, num_imputations = 5) {
   return(models)
 }
 
-## continous outcomes #
+## continuous outcomes #
 edu_cmest_1 <- function(x, num_imputations = 5) {
   models <- list()
   
@@ -288,7 +288,7 @@ income_cmest_1 <- function(x, num_imputations = 5) {
 }
 
 
-#This function extracts and pools the estimates when the outcome is ORDINAL
+#This function extracts and pools the estimates when the outcome is ordinal
 
 poolRR0<- function(x) {
   ##TOTAL EFFECT
@@ -397,7 +397,7 @@ poolRR0<- function(x) {
 }
 
 
-#This function extracts and pools the estimates when the outcome is CONTINOUS
+#This function extracts and pools the estimates when the outcome is continuous
 
 poolRR1<- function(x) {
   ##TOTAL EFFECT
