@@ -1,5 +1,5 @@
 ### THIS SCRIPT THE CODE FOR THE ANALYSES OF THE PAPER: "Association of childhood and adult socioeconomic status with adult social relationships" ###
-#CONTENTS: 1) Data wrangling, imputation, 2) Regression models, 3) Causal Mediation Analysis, 4) Sensitivity analysis, 5) CMA with interaction ExpxMed
+#CONTENTS: 1) Data wrangling, imputation, 2) Regression models, 3) Causal Mediation Analysis, 4) Sensitivity analyses, 5) CMA with interaction ExpxMed, 6) Supplementary Material: empirical check of the positivity assumption
 
 ### 1. Preparing the dataset: Multiple Imputation and Re-Scaling the variables ###
 #1.1. Select complete data at baseline (n=3,358)
@@ -117,21 +117,21 @@ print(summary_data[, c("term", "estimate", "std.error", "Lower_CI", "Upper_CI", 
 num_imputations <- 5  # Change this to the actual number of imputations
 
 fit_models <- lapply(1:num_imputations, function(i) {
-  polr(lon_TILS ~ edu80 + sex + age, Hess = TRUE, data = imp_reg %>% filter(.imp == i))
+  polr(lon_TILS ~ edu80 + age, Hess = TRUE, data = imp_reg %>% filter(.imp == i))
 })
 
 lon_edu_done<-alltherest(fit_models)
 
 #edu-edu07 exposure-mediator
 edu_edu07 <- lapply(1:num_imputations, function(i) {
-  glm(formula = edu107 ~ edu80 + sex + age, family = binomial(), data = imp_reg %>% filter(.imp == i))
+  glm(formula = edu107 ~ edu80 + age, family = binomial(), data = imp_reg %>% filter(.imp == i))
 })
 
 edu_edu07_done<-alltherest(edu_edu07)
 
 #lon_edu mediator-outcome 
 lon_edu07 <- lapply(1:num_imputations, function(i) {
-  polr(lon_TILS ~ edu107 + sex + age + income80, Hess = TRUE, data = imp_reg %>% filter(.imp == i))
+  polr(lon_TILS ~ edu107 + age + income80, Hess = TRUE, data = imp_reg %>% filter(.imp == i))
 })
 
 lon_edu07_done<-alltherest(lon_edu07)
@@ -139,21 +139,21 @@ lon_edu07_done<-alltherest(lon_edu07)
 #Example 2-Regression models: perceived social support and income 
 ##exposure-outcome
 sp_inc <- lapply(1:num_imputations, function(i) {
-  lm(mspss.inv_sc ~ income80 + age + sex +edu80, data = imp_reg %>% filter(.imp == i))
+  lm(mspss.inv_sc ~ income80 + age +edu80, data = imp_reg %>% filter(.imp == i))
 })
 
 sp_inc_done<-CI(sp_inc)
 
 #exposure-mediator 
 inc_inc07 <- lapply(1:num_imputations, function(i) {
-  glm(formula = income07 ~ income80 + sex + age + edu80, family = binomial(), data = imp_reg %>% filter(.imp == i))
+  glm(formula = income07 ~ income80 + age + edu80, family = binomial(), data = imp_reg %>% filter(.imp == i))
 })
 
 inc_inc07_done<-alltherest(inc_inc07)
 
 #mediator-outcome
 sp_inc07 <- lapply(1:num_imputations, function(i) {
-  lm(mspss.inv_sc ~ income07 + age + sex + edu80 + edu107, data = imp_reg %>% filter(.imp == i))
+  lm(mspss.inv_sc ~ income07 + age + edu80 + edu107, data = imp_reg %>% filter(.imp == i))
 })
 
 sp_inc07<-CI(sp_inc07)
@@ -176,12 +176,12 @@ edu_cmest_0 <- function(x, num_imputations = 5) {
       data = get(dataset_var), 
       model = "msm", outcome = x, 
       exposure = "edu80", mediator = "edu107", 
-      basec = c("age", "sex"), postc = "income80", 
+      basec = c("age"), postc = "income80", 
       EMint = FALSE, ereg = "logistic", 
       yreg = "ordinal", mreg = list("logistic"),
       wmnomreg = list("logistic"), wmdenomreg = list("logistic"),
       astar = 0, a = 1, mval = list(1), 
-      estimation = "imputation", inference = "bootstrap"
+      estimation = "imputation", inference = "bootstrap", nboot=1000
     )
     
     if (!is.null(model)) {
@@ -207,12 +207,12 @@ income_cmest_0 <- function(x, num_imputations = 5) {
     model <- cmest(
       data = get(dataset_var), 
       model = "msm", outcome = x, 
-      exposure = "income80", mediator = "income07", basec = c("age", "sex", "edu80"), 
+      exposure = "income80", mediator = "income07", basec = c("age", "edu80"), 
       postc = "edu107", EMint = F,
       ereg = "logistic", yreg = "ordinal", mreg = list("logistic"),
       wmnomreg = list("logistic"), wmdenomreg = list("logistic"),
       astar = 0, a = 1, mval = list(1), 
-      estimation = "imputation", inference = "bootstrap")
+      estimation = "imputation", inference = "bootstrap", nboot=1000)
     
     if (!is.null(model)) {
       # Get the summary of the model
@@ -238,12 +238,12 @@ edu_cmest_1 <- function(x, num_imputations = 5) {
     model <- cmest(
       data = get(dataset_var), 
       model = "msm", outcome = x, 
-      exposure = "edu80", mediator = "edu107", basec = c("age", "sex"), 
+      exposure = "edu80", mediator = "edu107", basec = c("age"), 
       postc = "income80", EMint = F,
       ereg = "logistic", yreg = "linear", mreg = list("logistic"),
       wmnomreg = list("logistic"), wmdenomreg = list("logistic"),
       astar = 0, a = 1, mval = list(1), 
-      estimation = "imputation", inference = "bootstrap")
+      estimation = "imputation", inference = "bootstrap", nboot=1000)
     
     if (!is.null(model)) {
       # Get the summary of the model
@@ -268,12 +268,12 @@ income_cmest_1 <- function(x, num_imputations = 5) {
     model <- cmest(
       data = get(dataset_var), 
       model = "msm", outcome = x, 
-      exposure = "income80", mediator = "income07", basec = c("age", "sex", "edu80"), 
+      exposure = "income80", mediator = "income07", basec = c("age", "edu80"), 
       postc = "edu107", EMint = F,
       ereg = "logistic", yreg = "linear", mreg = list("logistic"),
       wmnomreg = list("logistic"), wmdenomreg = list("logistic"),
       astar = 0, a = 1, mval = list(1), 
-      estimation = "imputation", inference = "bootstrap")
+      estimation = "imputation", inference = "bootstrap", nboot=1000)
     
     if (!is.null(model)) {
       # Get the summary of the model
@@ -506,7 +506,7 @@ poolRR1<- function(x) {
 }
 
 
-#EXAMPLE: Loneliness x Income (Same procedure for all the causal mediation models)
+#EXAMPLE: Loneliness x Income (Same procedure for all mediation models)
 set.seed(5)
 
 #Runs the models in the 5 imputed datasets 
@@ -528,7 +528,8 @@ all_loninc <- bind_rows(loninc_dfs, .id = "Imputation")
 #pooled results
 poolRR0(all_lonedu)
 
-#### Sensitivity analysis for unmeasured confounding (e-value) ###
+#### 4. Sensitivity analyses ###
+#4.1. Sensitivity analysis for unmeasured confounding (e-value) 
 
 sens_analysis <- function(models_result) {
   sens_results <- list()
@@ -548,11 +549,18 @@ sens_analysis <- function(models_result) {
 }
 
 # Example: Loneliness and education
-lonedu_models<- edu_cmest_0sa("lon_TILS") #edu_cmest0sa is a function as the one used before but that storages in the final lists the models temselves instead of the models' summaries 
+lonedu_models<- edu_cmest_0sa("lon_TILS") #edu_cmest0sa is a function as the one used before but that storages in the final lists the models instead of the models' summaries 
 lon_edu_sa<-sens_analysis(lonedu_models)
 print(lon_edu_sa)
 
-### For models including the interaction, the procedure was the same, but the function sets EMint=T#
+#4.2. Sensitivity analysis for the adult educational attainment measure
+#educational attainment (primary and low secondary education as risk)
+imp_data$edu107 <-recode(imp_data$edu107, `0` = 1, `1` = 0, `2` = 0, `3` = 0) #less that upper secondary school as at risk 
+
+#Same CMA models as in the main analysis
+
+### 5. CMA with interaction Exp x Med
+#For models including the interaction, the procedure was the same, but the function sets EMint=T
 edu_cmest_int0 <- function(x, num_imputations = 5) {
   models <- list()
   
@@ -565,12 +573,12 @@ edu_cmest_int0 <- function(x, num_imputations = 5) {
       data = get(dataset_var), 
       model = "msm", outcome = x, 
       exposure = "edu80", mediator = "edu107", 
-      basec = c("age", "sex"), postc = "income80", 
+      basec = c("age"), postc = "income80", 
       EMint = T, ereg = "logistic", 
       yreg = "ordinal", mreg = list("logistic"),
       wmnomreg = list("logistic"), wmdenomreg = list("logistic"),
       astar = 0, a = 1, mval = list(1), 
-      estimation = "imputation", inference = "bootstrap"
+      estimation = "imputation", inference = "bootstrap", nboot=1000
     )
     
     if (!is.null(model)) {
@@ -584,4 +592,50 @@ edu_cmest_int0 <- function(x, num_imputations = 5) {
   
   return(models)
 }
+
+### 6. Supplementary Material: empirical check of the positivity assumption
+# PS for the exposure
+Positivity <- function(x) {
+  #### SES indicator: educational attainment ###
+  # Fit a propensity score model for the exposure
+  ps_model_exposure1 <- glm(edu80 ~ age, data = x, family = binomial())
+  
+  # PS for the mediator
+  ps_model_mediator1 <- glm(edu107 ~ edu80 + age + income80, data = x, family = binomial())
+  
+  x$ps_exposure1 <- predict(ps_model_exposure1, type = "response")
+  x$ps_mediator1 <- predict(ps_model_mediator1, type = "response")
+  
+  ## SUMMARY STATISTICS ##
+  # Summary statistics for exposure propensity scores
+  print(summary(x$ps_exposure1[x$edu80 == 0]))
+  print(summary(x$ps_exposure1[x$edu80 == 1]))
+  
+  # Summary statistics for mediator propensity scores
+  print(summary(x$ps_mediator1[x$edu107 == 0]))
+  print(summary(x$ps_mediator1[x$edu107 == 1]))
+  
+  #### SES indicator: income ###
+  ps_model_exposure2 <- glm(income80 ~ age  + edu80, data = x, family = binomial())
+  ps_model_mediator2 <- glm(income07 ~ income80 + age + edu80 + edu107, data = x, family = binomial())
+
+  x$ps_exposure2 <- predict(ps_model_exposure2, type = "response")
+  x$ps_mediator2 <- predict(ps_model_mediator2, type = "response")
+  
+  ## SUMMARY STATISTICS ##
+  # Summary statistics for exposure propensity scores
+  print(summary(x$ps_exposure2[x$income80 == 0]))
+  print(summary(x$ps_exposure2[x$income80 == 1]))
+  
+  # Summary statistics for mediator propensity scores
+  print(summary(x$ps_mediator2[x$income07 == 0]))
+  print(summary(x$ps_mediator2[x$income07 == 1]))
+}
+
+#Run in the 5 imputed datasets
+Positivity(imputed_dataset_1)
+Positivity(imputed_dataset_2)
+Positivity(imputed_dataset_3)
+Positivity(imputed_dataset_4)
+Positivity(imputed_dataset_5)
 
