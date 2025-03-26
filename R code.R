@@ -1,7 +1,7 @@
-### THIS SCRIPT THE CODE FOR THE ANALYSES OF THE PAPER: "Association of childhood and adult socioeconomic status with adult social relationships" ###
+### THIS SCRIPT CONTAINS THE CODE FOR THE ANALYSIS OF THE PAPER: "Association of childhood and adult socioeconomic status with adult social connection: a mediation analysis" ###
 #CONTENTS: 1) Data wrangling, imputation, 2) Regression models, 3) Causal Mediation Analysis, 4) Sensitivity analyses, 5) CMA with interaction ExpxMed, 6) Supplementary Material: empirical check of the positivity assumption
 
-### 1. Preparing the dataset: Multiple Imputation and Re-Scaling the variables ###
+### 1. Preparing the dataset: Multiple Imputation and Rescaling the variables ###
 #1.1. Model variables and auxiliary variables as factors
 vars_to_convert <- c("edu80", "edu107", "edu111", "occ80", "occ107", "occ111", 
                      "income80", "income07", "income11", "toimi80", "toimi07", 
@@ -526,27 +526,8 @@ all_loninc <- bind_rows(loninc_dfs, .id = "Imputation")
 poolRR0(all_lonedu)
 
 #### 4. Sensitivity analyses ###
-#4.1. Multiple imputation without auxiliary variables
 
-library(mice)
-init = mice(data_MI, maxit=0) 
-meth = init$method
-predM = init$predictorMatrix
-
-#id has not predictive value
-predM[, c("id")]=0
-
-meth[c("age", "loneliness", "social_network", "social_relations", "edu80")]="pmm" #numerical
-meth[c("income80", "edu107", "income07")]="polr" #categorical ordered
-
-set.seed(103)
-imputedMI = mice(data_MI, method=meth, predictorMatrix=predM, m=5)
-
-imputed_datasetsMI <- complete(imputedMI, action = "long", include = TRUE)
-
-#From here, the same procedure as described in 1.3.
-
-#4.2. Sensitivity analysis for unmeasured confounding (e-value) 
+#4.1. Sensitivity analysis for unmeasured confounding (e-value) 
 
 sens_analysis <- function(models_result) {
   sens_results <- list()
@@ -565,19 +546,135 @@ sens_analysis <- function(models_result) {
   return(sens_results)
 }
 
-# Example: Loneliness and education
-lonedu_models<- edu_cmest_0sa("lon_TILS") #edu_cmest0sa is a function as the one used before but that storages in the final lists the models instead of the models' summaries 
+# Example: Exp/Med: education attainment, Out: loneliness
+lonedu_models<- edu_cmest_0sa("lon_TILS") #edu_cmest0sa is a function as the one used before, but it stores in the final lists the models instead of the models' summaries 
 lon_edu_sa<-sens_analysis(lonedu_models)
 print(lon_edu_sa)
 
-#4.3. Sensitivity analysis for the adult educational attainment measure
+#4.2. Sensitivity analysis for the adult educational attainment measure
 #educational attainment (primary and low secondary education as risk)
 imp_data$edu107 <-recode(imp_data$edu107, `0` = 1, `1` = 0, `2` = 0, `3` = 0) #less that upper secondary school as at risk 
 
 #Same CMA models as in the main analysis
 
+#4.3. Sensitivity analysis with non-dichotomous mediators and confounders using the parametric g-formula
+
+#Example: Exp/Med: education attainment, Out: loneliness
+edulon_gformula28 <- function(x, num_imputations = 5) {
+  models <- list()
+  
+  for (i in 1:num_imputations) {
+    # Create the dataset variable name (imputed_dataset_i)
+    dataset_var <- paste0("imputed_dataset_", i)
+    
+    # Perform cmest for each imputation
+    model <- cmest(
+      data = get(dataset_var), model = "gformula", outcome = x, exposure = "edu80",
+      mediator = "edu107_org", basec = c("age", "sex"), postc = "tulot80", EMint = F,
+      mreg = list("ordinal"), yreg = "ordinal", postcreg = list("ordinal"),
+      astar = 0, a = 1, mval = list(3), estimation = "imputation", inference = "bootstrap", nboot = 1000) #mval= highest mediator level 
+    
+    
+    if (!is.null(model)) {
+      # Get the summary of the model
+      model_summary <- summary(model)
+      
+      # Add the model summary to the list
+      models[[paste0("m", i)]] <- model_summary
+    }
+  }
+  
+  return(models)
+}
+
+#Example: Exp/Med: income, Out: loneliness (income treated as ordinal variable)
+inclon_gformula28 <- function(x, num_imputations = 5) {
+  models <- list()
+  
+  for (i in 1:num_imputations) {
+    # Create the dataset variable name (imputed_dataset_i)
+    dataset_var <- paste0("imputed_dataset_", i)
+    
+    # Perform cmest for each imputation
+    model <- cmest(
+      data = get(dataset_var), 
+      model = "gformula", outcome = x, 
+      exposure = "income80", mediator = "income07_org", basec = c("age", "sex", "max_koulv_ord"), 
+      postc = "edu107_org", EMint = F, yreg = "ordinal", mreg = list("ordinal"), postcreg = list("ordinal"),
+      astar = 0, a = 1, mval = list(8), estimation = "imputation", inference = "bootstrap", nboot = 1000)
+    
+    if (!is.null(model)) {
+      # Get the summary of the model
+      model_summary <- summary(model)
+      
+      # Add the model summary to the list
+      models[[paste0("m", i)]] <- model_summary
+    }
+  }
+  
+  return(models)
+}
+
+#Same two examples as above, but with income treated as a continuous variable
+
+edulon_gformula <- function(x, num_imputations = 5) {
+  models <- list()
+  
+  for (i in 1:num_imputations) {
+    # Create the dataset variable name (imputed_dataset_i)
+    dataset_var <- paste0("imputed_dataset_", i)
+    
+    # Perform cmest for each imputation
+    model <- cmest(
+      data = get(dataset_var), model = "gformula", outcome = x, exposure = "edu80",
+      mediator = "edu107_org", basec = c("age", "sex"), postc = "income80_cont", EMint = F,
+      mreg = list("ordinal"), yreg = "ordinal", postcreg = list("linear"),
+      astar = 0, a = 1, mval = list(3), estimation = "imputation", inference = "bootstrap", nboot = 1000
+    ) #mval= highest mediator level 
+    
+    if (!is.null(model)) {
+      # Get the summary of the model
+      model_summary <- summary(model)
+      
+      # Add the model summary to the list
+      models[[paste0("m", i)]] <- model_summary
+    }
+  }
+  
+  return(models)
+}
+
+inclon_gformula0 <- function(x, num_imputations = 5) {
+  models <- list()
+  
+  for (i in 1:num_imputations) {
+    # Create the dataset variable name (imputed_dataset_i)
+    dataset_var <- paste0("imputed_dataset_", i)
+    
+    # Perform cmest for each imputation
+    model <- cmest(
+      data = get(dataset_var), 
+      model = "gformula", outcome = x, 
+      exposure = "income80", mediator = "income07_cont", basec = c("age", "sex", "max_koulv_ord"), 
+      postc = "edu107_org", EMint = F, yreg = "ordinal", mreg = list("linear"), postcreg = list("ordinal"),
+      astar = 0, a = 1, mval = list(8), estimation = "imputation", inference = "bootstrap", nboot = 1000)
+    
+    if (!is.null(model)) {
+      # Get the summary of the model
+      model_summary <- summary(model)
+      
+      # Add the model summary to the list
+      models[[paste0("m", i)]] <- model_summary
+    }
+  }
+  
+  return(models)
+}
+
+
 ### 5. CMA with interaction Exp x Med
-#For models including the interaction, the procedure was the same, but the function sets EMint=T. Example:
+# The procedure was the same for models including the interaction, but the function sets EMint=T. Example:
+
 edu_cmest_int0 <- function(x, num_imputations = 5) {
   models <- list()
   
@@ -615,7 +712,7 @@ edu_cmest_int0 <- function(x, num_imputations = 5) {
 #Following #https://simonejdemyr.com/r-tutorials/statistics/tutorial8.html 
 #Example using imputed_dataset1
 
-#Eductional attainment models 
+#Educational attainment models 
 # Fit a propensity score model for the exposure
 ps_model_exposure1 <- glm(edu80 ~ age, data = imputed_dataset_1, family = binomial())
 
