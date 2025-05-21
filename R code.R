@@ -19,8 +19,8 @@ predM = init$predictorMatrix
 predM[, c("id")]=0
 
 meth[c("age", "loneliness", "social_network", "social_relations")]="pmm" #numerical
-meth[c("income80", "edu107", "income07", "edu111", "income11")]="polr" #categorical ordered
-#meth[c("sex", "edu80", "occ80", "toimi80")]="logreg" #binary #no need as I have selected complete cases for baseline variables
+meth[c("edu107", "income07", "edu111", "income11")]="polr" #categorical ordered
+meth[c("sex", "income80", "edu80", "occ80", "toimi80")]="logreg" #binary 
 meth[c("occ107", "occ111","toimi07", "toimi11")]= "polyreg" #categorical unordered
 
 set.seed(103)
